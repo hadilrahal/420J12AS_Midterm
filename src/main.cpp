@@ -7,6 +7,9 @@
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
 
+#include <algorithm>   // (ajout Q1)
+#include "entity.h"    // (ajout Q1)
+
 /*
  * EXAMEN DE MI-SESSION
  *
@@ -62,6 +65,9 @@ class GameApp final
 	SDL_Texture *Runes = nullptr;
 	float SampleAverageFPS = 0.0f;
 
+	// (ajout Q1) Liste d'entités pour le pattern Composant
+	std::vector<std::unique_ptr<Entity>> Entities;
+
 	GameApp ()
 	{
 		if (SDL_Init (SDL_INIT_VIDEO) == false)
@@ -94,10 +100,13 @@ class GameApp final
 		SDL_Time time;
 		SDL_GetCurrentTime (&time);
 		SDL_srand (time);
+
+		// (Q1) 
 	}
 
 	~GameApp ()
 	{
+		SDL_DestroyTexture (Runes);
 		SDL_DestroyRenderer (Renderer);
 		SDL_DestroyWindow (Window);
 		SDL_Quit ();
@@ -114,6 +123,20 @@ class GameApp final
 		const float sum = std::accumulate (_frame_times.begin (), _frame_times.end (), 0.0f);
 		const float average = sum / static_cast<float> (_frame_times.size ());
 		SampleAverageFPS = average > 0 ? 1.0f / average : 0;
+	}
+
+	// (ajout Q1) UpdateMethod centralisé
+	void UpdateAll(float dt)
+	{
+		for (auto& e : Entities)
+			if (e->Alive) e->Update(dt);
+	}
+
+	// (ajout Q1) Draw centralisé
+	void DrawAll()
+	{
+		for (auto& e : Entities)
+			if (e->Alive) e->Draw(Renderer);
 	}
 };
 
@@ -140,6 +163,9 @@ main (int argc, char *argv[])
 			last_time = current_time;
 			app->CalculateFPS (delta_time);
 
+			// (ajout Q1) Update de toutes les entités
+			app->UpdateAll(delta_time);
+
 			SDL_SetRenderDrawColor (app->Renderer, 12, 12, 44, 255);
 			SDL_RenderClear (app->Renderer);
 
@@ -151,6 +177,9 @@ main (int argc, char *argv[])
 							static_cast<float> (win_size.y));
 			SDL_RenderLine (app->Renderer, 0.f, static_cast<float> (win_size.y),
 							static_cast<float> (win_size.x), 0.f);
+
+			// (ajout Q1) Draw de toutes les entités
+			app->DrawAll();
 
 			static float displayed;
 			static float count;
