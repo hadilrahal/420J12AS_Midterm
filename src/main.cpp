@@ -53,7 +53,7 @@
  *
  */
 
-static const std::string AppTitle = "Examen - Mi-session - Hadil Rahal;
+static const std::string AppTitle = "Examen - Mi-session - Hadil Rahal";
 static constexpr size_t MAX_SAMPLES = 100;
 
 // ====================== (ajout Q2) Composants de rendu ======================
@@ -70,7 +70,7 @@ struct RectRenderComponent : public Component
 	SDL_Color Color{ 255, 255, 255, 255 };
 	explicit RectRenderComponent(SDL_Color c) : Color(c) {}
 
-	void Draw(Entity& owner, SDL_Renderer* renderer) override
+	void Draw(Entity& owner, SDL_Renderer* renderer)
 	{
 		auto* t = owner.GetComponent<TransformComponent>();
 		if (!t) return;
@@ -88,7 +88,7 @@ struct SpriteRenderComponent : public Component
 	SpriteRenderComponent(SDL_Texture* tex, SDL_FRect src)
 		: Texture(tex), Src(src) {}
 
-	void Draw(Entity& owner, SDL_Renderer* renderer) override
+	void Draw(Entity& owner, SDL_Renderer* renderer)
 	{
 		auto* t = owner.GetComponent<TransformComponent>();
 		if (!t || !Texture) return;
