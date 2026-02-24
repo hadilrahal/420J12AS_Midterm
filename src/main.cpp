@@ -53,7 +53,7 @@
  *
  */
 
-static const std::string AppTitle = "Examen - Mi-session - [AJOUTER VOTRE NOM ET PRÉNOM ICI]";
+static const std::string AppTitle = "Examen - Mi-session - Hadil Rahal;
 static constexpr size_t MAX_SAMPLES = 100;
 
 // ====================== (ajout Q2) Composants de rendu ======================
