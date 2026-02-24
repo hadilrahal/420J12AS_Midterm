@@ -10,6 +10,7 @@
 #include <algorithm>   // (ajout Q1)
 #include "entity.h"    // (ajout Q1)
 #include <functional>  // (ajout Q3)
+#include <utility>     // (correction) pour std::move
 
 /*
  * EXAMEN DE MI-SESSION
@@ -70,13 +71,17 @@ struct RectRenderComponent : public Component
 	SDL_Color Color{ 255, 255, 255, 255 };
 	explicit RectRenderComponent(SDL_Color c) : Color(c) {}
 
-	void Draw(Entity& owner, SDL_Renderer* renderer)
+	// (correction) Draw prend void* comme dans entity.h
+	void Draw(Entity& owner, void* renderer) override
 	{
 		auto* t = owner.GetComponent<TransformComponent>();
-		if (!t) return;
+		if (!t || !renderer) return;
 
-		SDL_SetRenderDrawColor(renderer, Color.r, Color.g, Color.b, Color.a);
-		SDL_RenderFillRect(renderer, &t->Rect);
+		// (correction) cast vers SDL_Renderer*
+		auto* r = static_cast<SDL_Renderer*>(renderer);
+
+		SDL_SetRenderDrawColor(r, Color.r, Color.g, Color.b, Color.a);
+		SDL_RenderFillRect(r, &t->Rect);
 	}
 };
 
@@ -88,13 +93,16 @@ struct SpriteRenderComponent : public Component
 	SpriteRenderComponent(SDL_Texture* tex, SDL_FRect src)
 		: Texture(tex), Src(src) {}
 
-	void Draw(Entity& owner, SDL_Renderer* renderer)
+	// (correction) Draw prend void* comme dans entity.h
+	void Draw(Entity& owner, void* renderer) override
 	{
 		auto* t = owner.GetComponent<TransformComponent>();
-		if (!t || !Texture) return;
+		if (!t || !Texture || !renderer) return;
+
+		auto* r = static_cast<SDL_Renderer*>(renderer);
 
 		// (ajout Q2) je dessine la sous-image Src de la texture dans le rectangle destination
-		SDL_RenderTexture(renderer, Texture, &Src, &t->Rect);
+		SDL_RenderTexture(r, Texture, &Src, &t->Rect);
 	}
 };
 
@@ -124,7 +132,6 @@ static bool PointInRect(float px, float py, const SDL_FRect& r)
 struct ClickableComponent : public Component
 {
 	MouseInput* Mouse = nullptr;
-	// je stocke une fonction à appeler quand c'est cliqué
 	std::function<void(Entity&)> OnClick;
 
 	ClickableComponent(MouseInput* m, std::function<void(Entity&)> cb)
@@ -144,14 +151,13 @@ struct ClickableComponent : public Component
 // (ajout Q3) je retourne une case au hasard dans le spritesheet (128x128 par case)
 static SDL_FRect RandomRuneSrc()
 {
-	// si ton image runes.png n'est pas une grille 4x4 de 128, ajuste COLS/ROWS.
 	const float CELL_W = 128.f;
 	const float CELL_H = 128.f;
 	const int COLS = 4;
 	const int ROWS = 4;
 
 	const int total = COLS * ROWS;
-	const int idx = SDL_rand(total); // 0..total-1
+	const int idx = SDL_rand(total);
 	const int cx = idx % COLS;
 	const int cy = idx / COLS;
 
@@ -210,7 +216,7 @@ class GameApp final
 		SDL_GetCurrentTime (&time);
 		SDL_srand (time);
 
-		// (Q1) 
+		// (Q1)
 
 		// ====================== (ajout Q2) Test visuel ======================
 		// (ajout Q2) je crée 1 rectangle et 1 sprite juste pour vérifier que mes composants draw marchent.
@@ -324,11 +330,12 @@ class GameApp final
 	void DrawAll()
 	{
 		for (auto& e : Entities)
-			if (e->Alive) e->Draw(Renderer);
+			if (e->Alive) e->Draw(static_cast<void*>(Renderer)); // (correction) void* comme entity.h
 	}
 };
 
-Sint32
+// (correction) sur Windows/MinGW, je garde un main normal (sinon il cherche WinMain)
+int
 main (int argc, char *argv[])
 {
 	const auto app = new GameApp ();
