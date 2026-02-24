@@ -9,6 +9,7 @@
 
 #include <algorithm>   // (ajout Q1)
 #include "entity.h"    // (ajout Q1)
+#include <functional>  // (ajout Q3)
 
 /*
  * EXAMEN DE MI-SESSION
