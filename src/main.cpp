@@ -55,6 +55,48 @@
 static const std::string AppTitle = "Examen - Mi-session - [AJOUTER VOTRE NOM ET PRÉNOM ICI]";
 static constexpr size_t MAX_SAMPLES = 100;
 
+// ====================== (ajout Q2) Composants de rendu ======================
+// (ajout Q2) je crée Transform (position/taille), RectRender (couleur), SpriteRender (texture + srcRect)
+
+struct TransformComponent : public Component
+{
+	SDL_FRect Rect{ 0.f, 0.f, 10.f, 10.f };
+	TransformComponent(float x, float y, float w, float h) { Rect = { x, y, w, h }; }
+};
+
+struct RectRenderComponent : public Component
+{
+	SDL_Color Color{ 255, 255, 255, 255 };
+	explicit RectRenderComponent(SDL_Color c) : Color(c) {}
+
+	void Draw(Entity& owner, SDL_Renderer* renderer) override
+	{
+		auto* t = owner.GetComponent<TransformComponent>();
+		if (!t) return;
+
+		SDL_SetRenderDrawColor(renderer, Color.r, Color.g, Color.b, Color.a);
+		SDL_RenderFillRect(renderer, &t->Rect);
+	}
+};
+
+struct SpriteRenderComponent : public Component
+{
+	SDL_Texture* Texture = nullptr;
+	SDL_FRect Src{ 0.f, 0.f, 0.f, 0.f };
+
+	SpriteRenderComponent(SDL_Texture* tex, SDL_FRect src)
+		: Texture(tex), Src(src) {}
+
+	void Draw(Entity& owner, SDL_Renderer* renderer) override
+	{
+		auto* t = owner.GetComponent<TransformComponent>();
+		if (!t || !Texture) return;
+
+		// (ajout Q2) je dessine la sous-image Src de la texture dans le rectangle destination
+		SDL_RenderTexture(renderer, Texture, &Src, &t->Rect);
+	}
+};
+
 class GameApp final
 {
 	std::vector<float> _frame_times;
@@ -102,6 +144,31 @@ class GameApp final
 		SDL_srand (time);
 
 		// (Q1) 
+
+		// ====================== (ajout Q2) Test visuel ======================
+		// (ajout Q2) je crée 1 rectangle et 1 sprite juste pour vérifier que mes composants draw marchent.
+		// (ajout Q2) les vraies runes + bouton seront faits en Q3.
+
+		// (ajout Q2) Rectangle test
+		{
+			auto e = std::make_unique<Entity>();
+			e->AddComponent<TransformComponent>(20.f, 60.f, 160.f, 70.f);
+			e->AddComponent<RectRenderComponent>(SDL_Color{ 80, 180, 255, 255 });
+			Entities.push_back(std::move(e));
+		}
+
+		// (ajout Q2) Sprite test (si la texture est chargée)
+		if (Runes != nullptr)
+		{
+			auto e = std::make_unique<Entity>();
+			e->AddComponent<TransformComponent>(800.f * 0.5f - 64.f, 600.f * 0.5f - 64.f, 128.f, 128.f);
+
+			// (ajout Q2) je prends la première case 128x128 du spritesheet (en Q3 je randomize)
+			SDL_FRect src = { 0.f, 0.f, 128.f, 128.f };
+			e->AddComponent<SpriteRenderComponent>(Runes, src);
+
+			Entities.push_back(std::move(e));
+		}
 	}
 
 	~GameApp ()
