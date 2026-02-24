@@ -97,6 +97,66 @@ struct SpriteRenderComponent : public Component
 	}
 };
 
+// ====================== (ajout Q3) Input + Click helper ======================
+
+struct MouseInput
+{
+	float x = 0.f;
+	float y = 0.f;
+	bool leftDown = false;
+	bool leftPressedThisFrame = false;
+	bool leftReleasedThisFrame = false;
+
+	void BeginFrame()
+	{
+		leftPressedThisFrame = false;
+		leftReleasedThisFrame = false;
+	}
+};
+
+static bool PointInRect(float px, float py, const SDL_FRect& r)
+{
+	return (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h);
+}
+
+// (ajout Q3) composant cliquable : si je clique dans le rect, j'appelle une action
+struct ClickableComponent : public Component
+{
+	MouseInput* Mouse = nullptr;
+	// je stocke une fonction à appeler quand c'est cliqué
+	std::function<void(Entity&)> OnClick;
+
+	ClickableComponent(MouseInput* m, std::function<void(Entity&)> cb)
+		: Mouse(m), OnClick(std::move(cb)) {}
+
+	void Update(Entity& owner, float) override
+	{
+		if (!Mouse || !OnClick) return;
+		auto* t = owner.GetComponent<TransformComponent>();
+		if (!t) return;
+
+		if (Mouse->leftPressedThisFrame && PointInRect(Mouse->x, Mouse->y, t->Rect))
+			OnClick(owner);
+	}
+};
+
+// (ajout Q3) je retourne une case au hasard dans le spritesheet (128x128 par case)
+static SDL_FRect RandomRuneSrc()
+{
+	// si ton image runes.png n'est pas une grille 4x4 de 128, ajuste COLS/ROWS.
+	const float CELL_W = 128.f;
+	const float CELL_H = 128.f;
+	const int COLS = 4;
+	const int ROWS = 4;
+
+	const int total = COLS * ROWS;
+	const int idx = SDL_rand(total); // 0..total-1
+	const int cx = idx % COLS;
+	const int cy = idx / COLS;
+
+	return SDL_FRect{ cx * CELL_W, cy * CELL_H, CELL_W, CELL_H };
+}
+
 class GameApp final
 {
 	std::vector<float> _frame_times;
@@ -109,6 +169,12 @@ class GameApp final
 
 	// (ajout Q1) Liste d'entités pour le pattern Composant
 	std::vector<std::unique_ptr<Entity>> Entities;
+
+	// (ajout Q3) je garde la souris + des pointeurs sur mes 3 runes
+	MouseInput Mouse;
+	Entity* Rune1 = nullptr;
+	Entity* Rune2 = nullptr;
+	Entity* Rune3 = nullptr;
 
 	GameApp ()
 	{
@@ -149,25 +215,79 @@ class GameApp final
 		// (ajout Q2) je crée 1 rectangle et 1 sprite juste pour vérifier que mes composants draw marchent.
 		// (ajout Q2) les vraies runes + bouton seront faits en Q3.
 
-		// (ajout Q2) Rectangle test
+		// ====================== (ajout Q3) je remplace le test par les vraies entités ======================
+		// (ajout Q3) je vide la liste (comme ça j'évite d'avoir les objets test en double)
+		Entities.clear();
+
+		// (ajout Q3) je crée 3 runes au milieu : x = 1/4, 2/4, 3/4 ; taille = 128x128
 		{
-			auto e = std::make_unique<Entity>();
-			e->AddComponent<TransformComponent>(20.f, 60.f, 160.f, 70.f);
-			e->AddComponent<RectRenderComponent>(SDL_Color{ 80, 180, 255, 255 });
-			Entities.push_back(std::move(e));
+			const float winW = 800.f;
+			const float winH = 600.f;
+			const float rw = 128.f;
+			const float rh = 128.f;
+
+			const float y = (winH * 0.5f) - (rh * 0.5f);
+
+			auto makeRune = [&](float centerX) -> std::unique_ptr<Entity>
+			{
+				auto e = std::make_unique<Entity>();
+				e->AddComponent<TransformComponent>(centerX - rw * 0.5f, y, rw, rh);
+
+				// sprite random
+				auto* sprite = e->AddComponent<SpriteRenderComponent>(Runes, RandomRuneSrc());
+
+				// clique => change d'apparence au hasard
+				e->AddComponent<ClickableComponent>(&Mouse, [sprite](Entity&)
+				{
+					sprite->Src = RandomRuneSrc();
+				});
+
+				return e;
+			};
+
+			auto r1 = makeRune(winW * 0.25f);
+			auto r2 = makeRune(winW * 0.50f);
+			auto r3 = makeRune(winW * 0.75f);
+
+			Rune1 = r1.get();
+			Rune2 = r2.get();
+			Rune3 = r3.get();
+
+			Entities.push_back(std::move(r1));
+			Entities.push_back(std::move(r2));
+			Entities.push_back(std::move(r3));
 		}
 
-		// (ajout Q2) Sprite test (si la texture est chargée)
-		if (Runes != nullptr)
+		// (ajout Q3) je crée le bouton (220x40) à 50 pixels du bas, centré en X
 		{
-			auto e = std::make_unique<Entity>();
-			e->AddComponent<TransformComponent>(800.f * 0.5f - 64.f, 600.f * 0.5f - 64.f, 128.f, 128.f);
+			const float winW = 800.f;
+			const float winH = 600.f;
 
-			// (ajout Q2) je prends la première case 128x128 du spritesheet (en Q3 je randomize)
-			SDL_FRect src = { 0.f, 0.f, 128.f, 128.f };
-			e->AddComponent<SpriteRenderComponent>(Runes, src);
+			const float bw = 220.f;
+			const float bh = 40.f;
+			const float x = (winW * 0.5f) - (bw * 0.5f);
+			const float y = (winH - 50.f) - bh;
 
-			Entities.push_back(std::move(e));
+			auto btn = std::make_unique<Entity>();
+			btn->AddComponent<TransformComponent>(x, y, bw, bh);
+			btn->AddComponent<RectRenderComponent>(SDL_Color{ 200, 200, 200, 255 });
+
+			// clique bouton => randomize les 3 runes
+			btn->AddComponent<ClickableComponent>(&Mouse, [this](Entity&)
+			{
+				auto randomize = [](Entity* rune)
+				{
+					if (!rune) return;
+					auto* sprite = rune->GetComponent<SpriteRenderComponent>();
+					if (sprite) sprite->Src = RandomRuneSrc();
+				};
+
+				randomize(Rune1);
+				randomize(Rune2);
+				randomize(Rune3);
+			});
+
+			Entities.push_back(std::move(btn));
 		}
 	}
 
@@ -215,12 +335,38 @@ main (int argc, char *argv[])
 	uint64_t last_time = SDL_GetPerformanceCounter ();
 	while (running == true)
 		{
+			// (ajout Q3) je reset les flags de clic chaque frame
+			app->Mouse.BeginFrame();
+
 			SDL_Event event;
 			while (SDL_PollEvent (&event) == true)
 				{
 					if (event.type == SDL_EVENT_QUIT)
 						{
 							running = false;
+						}
+
+					// (ajout Q3) je capture la souris pour pouvoir cliquer sur les runes + bouton
+					if (event.type == SDL_EVENT_MOUSE_MOTION)
+						{
+							app->Mouse.x = event.motion.x;
+							app->Mouse.y = event.motion.y;
+						}
+					if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+						{
+							if (event.button.button == SDL_BUTTON_LEFT)
+								{
+									app->Mouse.leftDown = true;
+									app->Mouse.leftPressedThisFrame = true;
+								}
+						}
+					if (event.type == SDL_EVENT_MOUSE_BUTTON_UP)
+						{
+							if (event.button.button == SDL_BUTTON_LEFT)
+								{
+									app->Mouse.leftDown = false;
+									app->Mouse.leftReleasedThisFrame = true;
+								}
 						}
 				}
 			const uint64_t freq = SDL_GetPerformanceFrequency ();
